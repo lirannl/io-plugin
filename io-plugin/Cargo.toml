@@ -1,0 +1,18 @@
+[package]
+name = "io-plugin"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rmp-serde = "1.1"
+serde = "1.0"
+tokio = "1.35"
+futures = "0.3"
+thiserror = "1.0"
+derive-io-plugin = { version = "*", path = "../derive-io-plugin" }

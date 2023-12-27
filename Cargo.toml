@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [ "derive-io-plugin", "io-plugin"]
+default-members = ["derive-io-plugin"]
+
+package.version = "0.1.0"
+
+package.authors = ["Liran Piade"]
+
+package.repository = "https://github.com/lirannl/plugins-io-rs"
+
+package.edition = "2021"
+
+package.license = "GPL3"
