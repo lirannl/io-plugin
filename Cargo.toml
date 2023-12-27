@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = [ "derive-io-plugin", "io-plugin"]
-default-members = ["derive-io-plugin"]
+members = [ "io-plugin", "io-plugin-macros", "io-plugin-tests"]
+default-members = ["io-plugin"]
 
 package.version = "0.1.0"
 
