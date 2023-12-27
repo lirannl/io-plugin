@@ -11,4 +11,8 @@ package.repository = "https://github.com/lirannl/plugins-io-rs"
 
 package.edition = "2021"
 
-package.license = "GPL3"
+package.license = "GPL-3.0-only"
+
+package.homepage = "https://github.com/lirannl/plugins-io-rs"
+
+package.readme = "readme.md"

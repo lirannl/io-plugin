@@ -5,7 +5,10 @@ authors.workspace = true
 repository.workspace = true
 edition.workspace = true
 license.workspace = true
+homepage.workspace = true
+readme.workspace = true
 publish = true
+description = "An stdio-based plugin system"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -15,4 +18,4 @@ serde = "1.0"
 tokio = "1.35"
 futures = "0.3"
 thiserror = "1.0"
-derive-io-plugin = { version = "*", path = "../derive-io-plugin" }
+derive-io-plugin = { version = "0.1.0", path = "../derive-io-plugin" }
