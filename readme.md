@@ -1,5 +1,5 @@
-#IO-Plugin
-A rust package which allows easily creating a plugin-system based on the following model:
+# IO-Plugin
+## A rust package which allows easily creating a plugin-system based on the following model:
 
 1. The host spawns instances of its' plugins (by runnning their executables)
 2. The host sends serialised messages on the plugin process' stdin
