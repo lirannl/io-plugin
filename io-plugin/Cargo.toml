@@ -16,4 +16,4 @@ description = "An stdio-based plugin system"
 serde = "1.0"
 futures = "0.3"
 thiserror = "1.0"
-io-plugin-macros = { version = "0.1.0", path = "../io-plugin-macros" }
+io-plugin-macros = { version = "0.2.0", path = "../io-plugin-macros" }
