@@ -7,7 +7,10 @@ use syn::{
     Expr, FnArg, ItemEnum, ItemTrait, Pat, Stmt, TraitItem, Type,
 };
 
-use crate::handle_interface::pascal_to_snake;
+use crate::{
+    handle_interface::pascal_to_snake,
+    util::{get_doc, list_attr_by_id},
+};
 
 pub fn generate_trait(
     original: ItemEnum,
@@ -53,7 +56,11 @@ pub fn generate_trait(
                     parse_quote_spanned!(original.span()=>(#types))
                 }
             };
-            parse_quote_spanned!(original.span()=>fn #name(&mut self, #args) -> #return_type;)
+            let doc = get_doc(original);
+
+            parse_quote_spanned!(original.span()=>
+            #doc
+            fn #name(&mut self, #args) -> #return_type;)
         })
         .collect::<Vec<_>>();
 
@@ -107,7 +114,17 @@ pub fn generate_trait(
         .collect::<Vec<_>>();
 
     let message_name = &message.ident;
+
+    let plugin_trait_doc = if let Some((_, doc)) =
+        list_attr_by_id(&original.attrs, "plugin_trait_doc")
+    {
+        let doc = doc.to_string();
+        doc[1..doc.len()-1].to_owned()
+    } else {
+        format!("This trait defines the plugin executable's interface. To use, implement it on a struct, and call [`{name}::main_loop`] (generally in the main function)")
+    };
     parse_quote_spanned!(original.span()=>
+    #[doc=#plugin_trait_doc]
     #vis trait #name {
         #(#methods)*
         fn main_loop(mut self) -> ! where Self: Sized {

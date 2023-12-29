@@ -7,6 +7,8 @@ use syn::{
     Arm, ItemEnum, ItemImpl, Type, Variant,
 };
 
+use crate::util::get_doc;
+
 type EnumVariants = Punctuated<Variant, Comma>;
 
 pub fn split_enum(input: &ItemEnum) -> (ItemEnum, ItemEnum, ItemImpl) {
@@ -15,18 +17,27 @@ pub fn split_enum(input: &ItemEnum) -> (ItemEnum, ItemEnum, ItemImpl) {
     let (mut message_variants, mut response_variants) = (EnumVariants::new(), EnumVariants::new());
     for variant in input.variants.iter() {
         let name = &variant.ident;
+
+        let doc = get_doc(variant);
+
         let mut fields = variant.fields.iter().collect::<Vec<_>>();
 
         let response: Variant = if let Some(field) = fields.pop() {
             match &field.ty {
                 Type::Tuple(types) if types.elems.len() > 0 => {
                     let types = &types.elems;
-                    parse_quote_spanned!(variant.span()=>#name(#types))
+                    parse_quote_spanned!(
+                        variant.span()=>
+                        #doc
+                        #name(#types))
                 }
                 Type::Tuple(_) => parse_quote_spanned!(variant.span()=>#name),
                 _ => {
                     let ty = &field.ty;
-                    parse_quote_spanned!(variant.span()=>#name(#ty))
+                    parse_quote_spanned!(
+                        variant.span()=>
+                        #doc
+                        #name(#ty))
                 }
             }
         } else {
@@ -38,9 +49,13 @@ pub fn split_enum(input: &ItemEnum) -> (ItemEnum, ItemEnum, ItemImpl) {
             .collect::<Punctuated<_, Comma>>();
 
         let new_variant: Variant = if message_types.len() == 0 {
-            parse_quote_spanned!(variant.span()=>#name)
+            parse_quote_spanned!(variant.span()=>
+            #doc
+            #name)
         } else {
-            parse_quote_spanned!(variant.span()=>#name (#message_types))
+            parse_quote_spanned!(variant.span()=>
+            #doc
+            #name (#message_types))
         };
         message_variants.extend_one(new_variant);
         response_variants.extend_one(response);
@@ -61,8 +76,7 @@ pub fn split_enum(input: &ItemEnum) -> (ItemEnum, ItemEnum, ItemImpl) {
                 .collect::<Punctuated<_, Comma>>();
             if fields.len() > 0 {
                 parse_quote_spanned!(variant.span()=>#response_name::#name(#fields) => #name_str,)
-            }
-            else {
+            } else {
                 parse_quote_spanned!(variant.span()=>#response_name::#name => #name_str,)
             }
         })

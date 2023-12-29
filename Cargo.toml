@@ -3,7 +3,7 @@ resolver = "2"
 members = [ "io-plugin", "io-plugin-macros", "io-plugin-tests"]
 default-members = ["io-plugin"]
 
-package.version = "0.2.0"
+package.version = "0.2.1"
 
 package.authors = ["Liran Piade"]
 

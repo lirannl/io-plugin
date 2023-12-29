@@ -9,7 +9,7 @@ use syn::{
     FnArg, Ident, ItemEnum, ItemTrait, TraitItem, Type, Variant,
 };
 
-use crate::util::generate_gate;
+use crate::util::{generate_gate, get_doc, list_attr_by_id};
 
 lazy_static! {
     pub static ref PASCAL_PARTS: Regex = Regex::new("[A-Z0-9_][a-z0-9_]+").unwrap();
@@ -38,7 +38,8 @@ pub fn generate_trait(
 ) -> ItemTrait {
     let host_gate = generate_gate(gates.get("host"));
     let vis = &message.vis;
-    let name = format_ident!("{}Handle", original.ident);
+    let plugin_name = &original.ident;
+    let name = format_ident!("{}Handle", plugin_name);
     let message_ident = &message.ident;
     let response_ident = &response.ident;
 
@@ -57,9 +58,23 @@ pub fn generate_trait(
         })
         .collect::<Vec<_>>();
 
-    eprintln!("{}", quote!(#(#methods)*));
+    let handle_doc = if let Some((_, doc)) = list_attr_by_id(&original.attrs, "handle_doc") {
+        let doc = doc.to_string();
+        doc[1..doc.len()-1].to_owned()
+    } else {
+        let article = if Regex::new("^[aeiouAEIOU]")
+            .unwrap()
+            .is_match(&plugin_name.to_string())
+        {
+            "an"
+        } else {
+            "a"
+        };
+        format!("This trait defines {article} `{plugin_name}` handle on the host. To use, implement it on a struct")
+    };
 
     let mut generated_host: ItemTrait = parse_quote_spanned!(message.span()=>
+    #[doc = #handle_doc]
     #vis trait #name {
         fn message(&mut self, message: #message_ident) -> impl futures::Future<Output = Result<#response_ident, Box<dyn std::error::Error>>>;
         #(#methods)*
@@ -136,7 +151,10 @@ fn generate_trait_fn(
         _ => quote!(Ok(#response_fields)),
     };
 
+    let doc = get_doc(original);
+
     parse_quote_spanned!(original.span()=>
+    #doc
     fn #name(#params) -> impl futures::Future<Output = Result<#return_type, Box<dyn std::error::Error>>> {
         async {
             let response = self.message(#message_type::#message_variant_name/* */#message_fields).await;
