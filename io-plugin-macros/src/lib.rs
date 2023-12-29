@@ -1,22 +1,14 @@
 #![feature(extend_one, let_chains, anonymous_lifetime_in_impl_trait)]
-use std::{collections::HashMap, fmt::Display};
 
-use lazy_static::lazy_static;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote_spanned};
-use regex::Regex;
-use syn::{parse_macro_input, parse_quote, spanned::Spanned, Attribute, ItemEnum};
-mod host_interface;
+use std::collections::HashMap;
+use syn::{parse_macro_input, spanned::Spanned, ItemEnum};
+use util::GATES_PARSER;
+mod handle_interface;
+mod util;
 mod variants;
-
-lazy_static! {
-    static ref GATES_PARSER: Regex = Regex::new("(\\w+)_gate\\W*=\\W*\"(\\w+)\"").unwrap();
-}
-
-fn generate_gate(gate: Option<impl Display>) -> Option<Attribute> {
-    let gate = gate?.to_string();
-    Some(parse_quote!(#[cfg(target_feature = #gate)]))
-}
+mod plugin_interface;
 
 #[proc_macro_attribute]
 pub fn io_plugin(attribute_data: TokenStream, input: TokenStream) -> TokenStream {
@@ -33,8 +25,14 @@ pub fn io_plugin(attribute_data: TokenStream, input: TokenStream) -> TokenStream
 
     input.ident = format_ident!("{}", input.ident.to_string().trim_start_matches("_"));
 
-    let (message, response) = variants::split_enum(&input);
-    let host_interface = host_interface::generate_trait(
+    let (message, response, response_impl) = variants::split_enum(&input);
+    let host_interface = handle_interface::generate_trait(
+        input.clone(),
+        message.clone(),
+        response.clone(),
+        gates.clone(),
+    );
+    let plugin_interface = plugin_interface::generate_trait(
         input.clone(),
         message.clone(),
         response.clone(),
@@ -51,7 +49,9 @@ pub fn io_plugin(attribute_data: TokenStream, input: TokenStream) -> TokenStream
     quote_spanned!(message.span()=>
     #message
     #response
+    #response_impl
     #host_interface
+    #plugin_interface
     )
     .into()
 }

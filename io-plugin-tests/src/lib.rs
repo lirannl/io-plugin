@@ -1,19 +1,36 @@
 use io_plugin::io_plugin;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use rmp_serde::{from_read, to_vec};
+use std::error::Error;
+#[allow(unused_imports)]
+use std::{
+    collections::HashMap,
+    io::{stdin, stdout, Write},
+};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum ConfigStatus {
-    Great,
-    Bad,
+#[io_plugin()]
+enum ExamplePlugin {
+    GetName(String),
+    UpdateConfig(String, HashMap<String, String>, (bool, u32)),
 }
 
-#[io_plugin(client_gate = "plugin")]
-enum ExamplePlugin {
-    #[host_trait_self(none)]
-    GetName(String),
-    UpdateConfig(String, HashMap<String, String>, bool),
-    #[host_trait_self(borrow)]
-    ConfigStatus(String, (ConfigStatus, u32)),
-    Stuff(String, ()),
+struct Handle {}
+impl ExamplePluginHandle for Handle {
+    async fn message(
+        &mut self,
+        _message: ExamplePluginMessage,
+    ) -> Result<ExamplePluginResponse, Box<dyn Error>> {
+        todo!()
+    }
+}
+
+struct Plugin {}
+
+impl ExamplePluginTrait for Plugin {
+    fn get_name(&mut self) -> String {
+        "Example".to_string()
+    }
+
+    fn update_config(&mut self, _instance: String, _arg2: HashMap<String, String>) -> (bool, u32) {
+        (true, 1)
+    }
 }

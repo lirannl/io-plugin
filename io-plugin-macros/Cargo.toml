@@ -14,6 +14,7 @@ proc-macro = true
 [dependencies]
 lazy_static = "1.4"
 quote = "1.0"
-syn = {version = "2.0", features = []}
+syn = {version = "2.0", features = ["extra-traits"]}
 regex = "1.10"
 itertools = "0.12"
+proc-macro2 = "1.0"

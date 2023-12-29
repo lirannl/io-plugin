@@ -175,10 +175,8 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "io-plugin-macros",
- "rmp-serde",
  "serde",
  "thiserror",
- "tokio",
 ]
 
 [[package]]
@@ -187,6 +185,7 @@ version = "0.1.0"
 dependencies = [
  "itertools",
  "lazy_static",
+ "proc-macro2",
  "quote",
  "regex",
  "syn",
@@ -198,7 +197,9 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "io-plugin",
+ "rmp-serde",
  "serde",
+ "tokio",
 ]
 
 [[package]]
