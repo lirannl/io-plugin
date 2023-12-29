@@ -11,7 +11,8 @@ mod plugin_interface;
 mod util;
 
 /// Generate a plugin-interface, based on an enum definition for its' operations
-/// 
+///
+/// The provided enum's variant must contain only owned data (no &'a) - otherwise, deserialiastaion will cause a compile-time error.
 /// The variants must be [`serde::Serialize`] + [`serde::Deserialize`].
 #[proc_macro_attribute]
 pub fn io_plugin(attribute_data: TokenStream, input: TokenStream) -> TokenStream {

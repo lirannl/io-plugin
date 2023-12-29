@@ -1,9 +1,15 @@
 [workspace]
 resolver = "2"
-members = [ "io-plugin", "io-plugin-macros", "io-plugin-tests"]
+members = [
+    "io-plugin",
+    "io-plugin-macros",
+    "example/io-plugin-example",
+    "example/host-example",
+    "example/plugin-example",
+]
 default-members = ["io-plugin"]
 
-package.version = "0.2.1"
+package.version = "0.3.0"
 
 package.authors = ["Liran Piade"]
 

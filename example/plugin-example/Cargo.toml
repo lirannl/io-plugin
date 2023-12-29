@@ -1,0 +1,15 @@
+[package]
+name = "plugin-example"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+readme.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+io-plugin-example = { path = "../io-plugin-example" }
+rand = "0.8"

@@ -4,7 +4,7 @@ use itertools::izip;
 use quote::format_ident;
 use syn::{
     parse_quote, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned, token::Comma, Arm,
-    Expr, FnArg, ItemEnum, ItemTrait, Pat, Stmt, TraitItem, Type,
+    Expr, FnArg, ItemEnum, ItemTrait, Pat, TraitItemFn, Type,
 };
 
 use crate::{
@@ -28,7 +28,7 @@ pub fn generate_trait(
     .collect::<Vec<_>>();
     let methods = variants
         .iter()
-        .map(|(original, message, response)| -> TraitItem {
+        .map(|(original, message, response)| -> TraitItemFn {
             let name = format_ident!("{}", pascal_to_snake(original.ident.to_string()));
 
             let args = message
@@ -60,7 +60,7 @@ pub fn generate_trait(
 
             parse_quote_spanned!(original.span()=>
             #doc
-            fn #name(&mut self, #args) -> #return_type;)
+            fn #name(&mut self, #args) -> Result<#return_type, Box<dyn std::error::Error>>;)
         })
         .collect::<Vec<_>>();
 
@@ -91,12 +91,6 @@ pub fn generate_trait(
                     parse_quote!(#ty::#v)
                 }
             };
-            let method_call: Option<Stmt> = if let TraitItem::Fn(method) = method {
-                let method_ident = &method.sig.ident;
-                Some(parse_quote!(let (#response_idents) = self.#method_ident(#message_idents);))
-            } else {
-                None
-            };
             let return_expr: Expr = {
                 let ty = &response.ident;
                 let v = &response_v.ident;
@@ -106,10 +100,16 @@ pub fn generate_trait(
                     parse_quote!(#ty::#v)
                 }
             };
-            parse_quote_spanned!(original_v.span()=>#pat => {
-                #method_call
-                #return_expr
-            })
+            let method_ident = &method.sig.ident;
+            let arm = parse_quote_spanned!(original_v.span()=>
+            #pat => {
+                match self.#method_ident(#message_idents) {
+                    #[allow(unused_parens)]
+                    Ok((#response_idents)) => Ok(#return_expr),
+                    Err(err) => Err(io_plugin::IOPluginError(err.to_string())),
+                }
+            });
+            arm
         })
         .collect::<Vec<_>>();
 
@@ -119,7 +119,7 @@ pub fn generate_trait(
         list_attr_by_id(&original.attrs, "plugin_trait_doc")
     {
         let doc = doc.to_string();
-        doc[1..doc.len()-1].to_owned()
+        doc[1..doc.len() - 1].to_owned()
     } else {
         format!("This trait defines the plugin executable's interface. To use, implement it on a struct, and call [`{name}::main_loop`] (generally in the main function)")
     };
@@ -133,7 +133,7 @@ pub fn generate_trait(
                             let response = match from_read::<_, #message_name>(stdin())? {
                                 #(#arms)*
                             };
-                            stdout().write_all(&to_vec(&Ok::<_, String>(response))?)?;
+                            stdout().write_all(&to_vec(&response.map_err(|err| io_plugin::IOPluginError(err.to_string())))?)?;
                             Ok(())
                         })()
                         .unwrap_or_else(|e| {

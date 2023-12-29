@@ -60,7 +60,7 @@ pub fn generate_trait(
 
     let handle_doc = if let Some((_, doc)) = list_attr_by_id(&original.attrs, "handle_doc") {
         let doc = doc.to_string();
-        doc[1..doc.len()-1].to_owned()
+        doc[1..doc.len() - 1].to_owned()
     } else {
         let article = if Regex::new("^[aeiouAEIOU]")
             .unwrap()
@@ -154,9 +154,10 @@ fn generate_trait_fn(
     let doc = get_doc(original);
 
     parse_quote_spanned!(original.span()=>
+    #[allow(unreachable_patterns)]
     #doc
     fn #name(#params) -> impl futures::Future<Output = Result<#return_type, Box<dyn std::error::Error>>> {
-        async {
+        async move {
             let response = self.message(#message_type::#message_variant_name/* */#message_fields).await;
             match response {
                 Ok(#response_type::#response_variant_name/* */#response_fields) => #ok,

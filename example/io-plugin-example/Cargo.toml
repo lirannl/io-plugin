@@ -1,5 +1,5 @@
 [package]
-name = "io-plugin-tests"
+name = "io-plugin-example"
 version.workspace = true
 authors.workspace = true
 repository.workspace = true
@@ -7,17 +7,15 @@ edition.workspace = true
 license.workspace = true
 homepage.workspace = true
 readme.workspace = true
-publish = false
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 futures = "0.3.30"
 
-io-plugin = { version = "0.2.1", path = "../io-plugin" }
+io-plugin = { path = "../../io-plugin" }
 serde = { version = "1.0", features = ["derive"] }
 tokio = "1.35"
 rmp-serde = "1.1"
+thiserror = "1.0"
 
 [features]
 default = ["plugin"]
