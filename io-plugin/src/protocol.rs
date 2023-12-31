@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{from_slice, to_vec};
+use rmp_serde::{from_slice, to_vec};
 use std::{
     error::Error,
     io::{Read, Write},

@@ -11,11 +11,9 @@ publish = true
 description = "An stdio-based plugin system"
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-futures = "0.3"
-io-plugin-macros = { version = "0.4.0", path = "../io-plugin-macros" }
-lazy_static = "1.4"
-rmp-serde = "1.1"
-serde_json = "1.0"
-tokio = { version = "1.35", default-features = false, features = ["io-util", "sync", "process"] }
+io-plugin-macros = { version = "0.4.1", path = "../io-plugin-macros" }
 thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+rmp-serde = "1.1"
+lazy_static = "1.4"
+tokio = { version = "1.35", default-features = false, features = ["io-util", "sync", "process"] }

@@ -21,4 +21,3 @@ regex = "1.10"
 itertools = "0.12"
 proc-macro2 = "1.0"
 serde = { version = "1.0", default_features = false }
-rmp-serde = "1.1"
