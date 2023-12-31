@@ -11,5 +11,8 @@ readme.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+io-plugin = { path = "../../io-plugin" }
 io-plugin-example = { path = "../io-plugin-example" }
 rand = "0.8"
+serde_json = "1.0"
+serde = { version = "1.0" }

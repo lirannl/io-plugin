@@ -1,16 +1,23 @@
-use std::{error::Error, fmt::Display};
+mod protocol;
 
 pub use io_plugin_macros::*;
-
+pub use protocol::{io_read, io_read_async, io_write, io_write_async};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use tokio::process::{ChildStdin, ChildStdout};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct IOPluginError(pub String);
-
-impl Display for IOPluginError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
+#[derive(Debug, Serialize, Deserialize, Error)]
+pub enum IOPluginError {
+    #[error("Pipe has been closed")]
+    PipeClosed,
+    #[error("{0}")]
+    Other(String),
 }
 
-impl Error for IOPluginError {}
+pub struct ChildStdio {
+    pub stdin: ChildStdin,
+    pub stdout: ChildStdout,
+}
+
+pub type Mutex<T> = tokio::sync::Mutex<T>;
+pub type Child = tokio::process::Child;

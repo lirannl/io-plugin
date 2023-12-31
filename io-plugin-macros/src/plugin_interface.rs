@@ -8,7 +8,7 @@ use syn::{
 };
 
 use crate::{
-    handle_interface::pascal_to_snake,
+    handle::pascal_to_snake,
     util::{get_doc, list_attr_by_id},
 };
 
@@ -106,7 +106,7 @@ pub fn generate_trait(
                 match self.#method_ident(#message_idents) {
                     #[allow(unused_parens)]
                     Ok((#response_idents)) => Ok(#return_expr),
-                    Err(err) => Err(io_plugin::IOPluginError(err.to_string())),
+                    Err(err) => Err(io_plugin::IOPluginError::Other(err.to_string())),
                 }
             });
             arm
@@ -128,16 +128,26 @@ pub fn generate_trait(
     #vis trait #name {
         #(#methods)*
         fn main_loop(mut self) -> ! where Self: Sized {
+                    let mut stdin = std::io::BufReader::new(std::io::stdin());
+                    let mut stdout = std::io::stdout();
+
                     loop {
                         (|| -> Result<(), Box<dyn std::error::Error>> {
-                            let response = match from_read::<_, #message_name>(stdin())? {
+                            let message: #message_name = io_plugin::io_read(stdin.get_mut())?;
+                            let response = match message {
                                 #(#arms)*
                             };
-                            stdout().write_all(&to_vec(&response.map_err(|err| io_plugin::IOPluginError(err.to_string())))?)?;
+                            io_plugin::io_write(&mut stdout, response)?;
                             Ok(())
                         })()
-                        .unwrap_or_else(|e| {
-                            let _ = stdout().write_all(&to_vec(&Err::<(), _>(format!("{e:#?}"))).unwrap_or_default());
+                        .unwrap_or_else(|err| {
+                            if let Some(&io_plugin::IOPluginError::PipeClosed) =
+                                err.downcast_ref::<io_plugin::IOPluginError>()
+                            {
+                                eprintln!("Host closed");
+                                std::process::exit(0);
+                            }
+                            eprintln!("{err:#?}")
                         });
                     }
                 }

@@ -31,7 +31,9 @@ impl ExamplePluginTrait for Plugin {
 
     fn random_bytes(&mut self, amount: usize) -> Result<Vec<u8>, Box<dyn StdError>> {
         let mut vec = Vec::with_capacity(amount);
-        vec.fill_with(|| thread_rng().gen());
+        for _ in 0..amount {
+            vec.push(thread_rng().gen())
+        }
         Ok(vec)
     }
 }

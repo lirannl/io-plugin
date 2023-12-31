@@ -1,18 +1,43 @@
-use quote::{format_ident, quote};
+use itertools::Itertools;
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote, ToTokens};
 use syn::{
     parse_quote_spanned,
     punctuated::Punctuated,
     spanned::Spanned,
     token::{Comma, Semi},
-    Arm, ItemEnum, ItemImpl, Type, Variant,
+    Arm, Attribute, ItemEnum, ItemImpl, Meta, MetaList, MetaNameValue, Type, Variant,
 };
 
 use crate::util::get_doc;
 
 type EnumVariants = Punctuated<Variant, Comma>;
 
-pub fn split_enum(input: &ItemEnum) -> (ItemEnum, ItemEnum, ItemImpl) {
+fn take_attributes(attributes: &mut Vec<Attribute>, id: &'_ str) -> Vec<Attribute> {
+    attributes
+        .extract_if(|a| {
+            a.path()
+                .get_ident()
+                .is_some_and(|ident| ident.to_string() == id)
+        })
+        .collect_vec()
+}
+fn attr_contents(attribute: Attribute) -> Option<TokenStream> {
+    match attribute.meta {
+        Meta::List(MetaList { tokens, .. }) => Some(tokens),
+        Meta::NameValue(MetaNameValue { value, .. }) => Some(value.into_token_stream()),
+        _ => None,
+    }
+}
+
+pub fn split_enum(input: &mut ItemEnum) -> (ItemEnum, ItemEnum, ItemImpl) {
     let vis = &input.vis;
+    let derives = take_attributes(&mut input.attrs, "derive")
+        .into_iter()
+        .find_map(attr_contents);
+
+    // let message_attributes = take_attributes(&mut input.attrs, "message_attributes");
+
     let attrs = input.attrs.iter().collect::<Punctuated<_, Semi>>();
     let (mut message_variants, mut response_variants) = (EnumVariants::new(), EnumVariants::new());
     for variant in input.variants.iter() {
@@ -85,7 +110,7 @@ pub fn split_enum(input: &ItemEnum) -> (ItemEnum, ItemEnum, ItemImpl) {
     (
         parse_quote_spanned!(input.span()=>
             #[forbid(non_camel_case_types)]
-            #[derive(serde::Deserialize, serde::Serialize)]
+            #[derive(serde::Deserialize, serde::Serialize, #derives)]
             #attrs
             #vis enum #message_name {
                 #message_variants
@@ -93,7 +118,7 @@ pub fn split_enum(input: &ItemEnum) -> (ItemEnum, ItemEnum, ItemImpl) {
         ),
         parse_quote_spanned!(input.span()=>
             #[forbid(non_camel_case_types)]
-            #[derive(serde::Deserialize, serde::Serialize)]
+            #[derive(serde::Deserialize, serde::Serialize, #derives)]
             #attrs
             #vis enum #response_name {
                 #response_variants

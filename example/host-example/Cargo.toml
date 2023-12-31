@@ -9,9 +9,17 @@ homepage.workspace = true
 readme.workspace = true
 
 [dependencies]
+io-plugin = { path = "../../io-plugin" }
 io-plugin-example = { path = "../io-plugin-example" }
 serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "1.35", features = ["rt-multi-thread", "macros", "process", "sync", "io-util", "io-std"] }
-rmp-serde = "1.1"
+tokio = { version = "1.35", features = [
+    "rt-multi-thread",
+    "macros",
+    "process",
+    "sync",
+    "io-util",
+    "io-std",
+] }
 regex = "1.10"
 lazy_static = "1.4"
+serde_json = "1.0"

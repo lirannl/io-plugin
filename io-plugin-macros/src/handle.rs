@@ -2,11 +2,12 @@ use std::{collections::HashMap, fmt::Display};
 
 use itertools::izip;
 use lazy_static::lazy_static;
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use regex::Regex;
 use syn::{
     parse_quote, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned, token::Comma,
-    FnArg, Ident, ItemEnum, ItemTrait, TraitItem, Type, Variant,
+    FnArg, Ident, ImplItemFn, ItemEnum, ItemStruct, Type, Variant,
 };
 
 use crate::util::{generate_gate, get_doc, list_attr_by_id};
@@ -30,12 +31,12 @@ pub fn pascal_to_snake(pascal: impl Display) -> String {
         .join("_")
 }
 
-pub fn generate_trait(
+pub fn generate_handle(
     original: ItemEnum,
     message: ItemEnum,
     response: ItemEnum,
     gates: HashMap<String, String>,
-) -> ItemTrait {
+) -> TokenStream {
     let host_gate = generate_gate(gates.get("host"));
     let vis = &message.vis;
     let plugin_name = &original.ident;
@@ -45,9 +46,9 @@ pub fn generate_trait(
 
     let methods = izip![&original.variants, &message.variants, &response.variants];
     let methods = methods
-        .map(|(original, message, response)| -> TraitItem {
-            let params = generate_trait_fn_args(original, message);
-            generate_trait_fn(
+        .map(|(original, message, response)| {
+            let params = generate_method_args(original, message);
+            generate_method(
                 original,
                 message,
                 message_ident,
@@ -66,34 +67,73 @@ pub fn generate_trait(
             .unwrap()
             .is_match(&plugin_name.to_string())
         {
-            "an"
+            "An"
         } else {
-            "a"
+            "A"
         };
-        format!("This trait defines {article} `{plugin_name}` handle on the host. To use, implement it on a struct")
+        format!("{article} `{plugin_name}` handle on the host")
     };
 
-    let mut generated_host: ItemTrait = parse_quote_spanned!(message.span()=>
+    let mut generated_host: ItemStruct = parse_quote_spanned!(message.span()=>
     #[doc = #handle_doc]
-    #vis trait #name {
-        fn message(&mut self, message: #message_ident) -> impl futures::Future<Output = Result<#response_ident, Box<dyn std::error::Error>>>;
-        #(#methods)*
+    #vis struct #name {
+            pub stdio: io_plugin::Mutex<io_plugin::ChildStdio>,
+            pub name: std::string::String,
+            pub process: io_plugin::Child,
         }
     );
     if let Some(host_gate) = host_gate {
         generated_host.attrs.extend_one(host_gate);
     }
-    generated_host
+    quote!(
+        #generated_host
+        impl #name {
+            async fn message(&mut self, message: #message_ident) -> Result<#response_ident, Box<dyn std::error::Error>> {
+                let stdio = &self.stdio;
+                let mut stdio = stdio.lock().await;
+                io_plugin::io_write_async(std::pin::pin!(&mut stdio.stdin), message).await?;
+                Ok(
+                    io_plugin::io_read_async::<Result<_, io_plugin::IOPluginError>>(std::pin::pin!(
+                        &mut stdio.stdout
+                    ))
+                    .await??,
+                )
+            }
+            pub async fn new(mut process: io_plugin::Child) -> Result<Self, Box<dyn std::error::Error>> {
+                let stdio = process
+                    .stdin
+                    .take()
+                    .and_then(|stdin| {
+                        Some(io_plugin::ChildStdio {
+                            stdin,
+                            stdout: process.stdout.take()?,
+                        })
+                    })
+                    .ok_or(Error::InitialisationError(
+                        "Stdin/stdout have not been piped".to_string(),
+                    ))?;
+
+                let mut handle = Self {
+                    process,
+                    stdio: io_plugin::Mutex::new(stdio),
+                    name: "".to_string(),
+                };
+                handle.name = handle.get_name().await?;
+                Ok(handle)
+            }
+            #(#methods)*
+        }
+    )
 }
 
-fn generate_trait_fn(
+fn generate_method(
     original: &Variant,
     message: &Variant,
     message_type: &Ident,
     response: &Variant,
     response_type: &Ident,
     params: Punctuated<FnArg, Comma>,
-) -> TraitItem {
+) -> ImplItemFn {
     let name = format_ident!("{}", pascal_to_snake(original.ident.to_string()));
     let message_variant_name = &message.ident;
     let response_variant_name = &response.ident;
@@ -156,27 +196,25 @@ fn generate_trait_fn(
     parse_quote_spanned!(original.span()=>
     #[allow(unreachable_patterns)]
     #doc
-    fn #name(#params) -> impl futures::Future<Output = Result<#return_type, Box<dyn std::error::Error>>> {
-        async move {
-            let response = self.message(#message_type::#message_variant_name/* */#message_fields).await;
-            match response {
-                Ok(#response_type::#response_variant_name/* */#response_fields) => #ok,
-                Err(e) => Err(e),
-                Ok(r) => {
-                    let res = std::fmt::format(
-                        format_args!(
-                            "Received {0}. Inappropriate variant",
-                            r.variant_name(),
-                        ),
-                    );
-                    Err(res.into())
-                }
+    pub async fn #name(#params) -> Result<#return_type, Box<dyn std::error::Error>> {
+        let response = self.message(#message_type::#message_variant_name/* */#message_fields).await;
+        match response {
+            Ok(#response_type::#response_variant_name/* */#response_fields) => #ok,
+            Err(e) => Err(e),
+            Ok(r) => {
+                let res = std::fmt::format(
+                    format_args!(
+                        "Received {0}. Inappropriate variant",
+                        r.variant_name(),
+                    ),
+                );
+                Err(res.into())
             }
         }
     })
 }
 
-fn generate_trait_fn_args(original: &Variant, message: &Variant) -> Punctuated<FnArg, Comma> {
+fn generate_method_args(original: &Variant, message: &Variant) -> Punctuated<FnArg, Comma> {
     // let self_attr = list_attr_by_id(&original.attrs, "self_behaviour");
     // let self_behaviour = if let Some((ident, content)) = &self_attr {
     //     let ident: Ident = parse_quote_spanned!(ident.span()=>#content);

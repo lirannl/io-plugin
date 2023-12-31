@@ -3,7 +3,7 @@ use std::fmt::Display;
 use lazy_static::lazy_static;
 use quote::quote;
 use regex::Regex;
-use syn::{parse_quote, Attribute, Expr, Ident, Meta, MetaNameValue, Variant, MetaList};
+use syn::{parse_quote, Attribute, Expr, Ident, Meta, MetaList, MetaNameValue, Variant};
 
 pub fn list_attr_by_id(
     original: &[Attribute],
