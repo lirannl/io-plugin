@@ -18,8 +18,6 @@ pub enum ExamplePlugin {
 pub enum Error {
     #[error("The result is mathematically invalid")]
     MathError,
-    #[error("Plugin failed to initialise: {0}")]
-    InitialisationError(String),
     #[error("{0}")]
     Generic(String),
 }

@@ -109,7 +109,7 @@ pub fn generate_handle(
                             stdout: process.stdout.take()?,
                         })
                     })
-                    .ok_or(Error::InitialisationError(
+                    .ok_or(io_plugin::IOPluginError::InitialisationError(
                         "Stdin/stdout have not been piped".to_string(),
                     ))?;
 

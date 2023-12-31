@@ -10,6 +10,8 @@ use tokio::process::{ChildStdin, ChildStdout};
 pub enum IOPluginError {
     #[error("Pipe has been closed")]
     PipeClosed,
+    #[error("Plugin failed to initialise: {0}")]
+    InitialisationError(String),
     #[error("{0}")]
     Other(String),
 }
