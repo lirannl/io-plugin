@@ -1,13 +1,15 @@
-use std::{collections::HashMap, fmt::Display};
-
-use itertools::izip;
+use itertools::{izip, Itertools};
 use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use regex::Regex;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 use syn::{
     parse_quote, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned, token::Comma,
-    FnArg, Ident, ImplItemFn, ItemEnum, ItemStruct, Type, Variant,
+    FnArg, Generics, Ident, ImplItemFn, ItemEnum, ItemStruct, Type, Variant,
 };
 
 use crate::util::{generate_gate, get_doc, list_attr_by_id};
@@ -44,6 +46,8 @@ pub fn generate_handle(
     let message_ident = &message.ident;
     let response_ident = &response.ident;
 
+    let generics = &original.generics;
+
     let methods = izip![&original.variants, &message.variants, &response.variants];
     let methods = methods
         .map(|(original, message, response)| {
@@ -55,6 +59,7 @@ pub fn generate_handle(
                 response,
                 response_ident,
                 params,
+                generics,
             )
         })
         .collect::<Vec<_>>();
@@ -85,44 +90,74 @@ pub fn generate_handle(
     if let Some(host_gate) = host_gate {
         generated_host.attrs.extend_one(host_gate);
     }
+
+    let (name_expr, name_param) = if let Some(get_name) = methods
+        .iter()
+        .find(|m| m.sig.ident.to_string() == "get_name")
+        && get_name.sig.inputs.len() == 1
+    {
+        let get_name = &get_name.sig.ident;
+        (quote!(handle.#get_name().await?), None)
+    } else {
+        (quote!(name), Some(quote!(name: String)))
+    };
+    let generics = &original.generics.params;
+    let de_generic = quote!(io_plugin::GenericValue);
+    let message_generics = message
+        .generics
+        .type_params()
+        .map(|g| g.ident.to_owned())
+        .collect_vec();
+    let message_de_generics = message_generics.iter().map(|_| &de_generic).collect_vec();
+    let response_generics = response
+        .generics
+        .type_params()
+        .map(|g| g.ident.to_owned())
+        .collect_vec();
+    let response_de_generics = response_generics.iter().map(|_| &de_generic).collect_vec();
+    let handle_impl = quote!(impl #name {
+        async fn message(&mut self, message: #message_ident <#(#message_de_generics),*>) -> Result<#response_ident<#(#response_de_generics),*>, Box<dyn std::error::Error>> {
+            self.message_generic::<#(#message_de_generics),*>(message).await
+        }
+        async fn message_generic<#generics>(&mut self, message: #message_ident <#(#message_generics),*>) -> Result<#response_ident<#(#response_generics),*>, Box<dyn std::error::Error>> {
+            let stdio = &self.stdio;
+            let mut stdio = stdio.lock().await;
+            io_plugin::io_write_async(std::pin::pin!(&mut stdio.stdin), message).await?;
+            Ok(
+                io_plugin::io_read_async::<Result<_, io_plugin::IOPluginError>>(std::pin::pin!(
+                    &mut stdio.stdout
+                ))
+                .await??,
+            )
+        }
+        pub async fn new(mut process: io_plugin::Child, #name_param) -> Result<Self, Box<dyn std::error::Error>> {
+            let stdio = process
+                .stdin
+                .take()
+                .and_then(|stdin| {
+                    Some(io_plugin::ChildStdio {
+                        stdin,
+                        stdout: process.stdout.take()?,
+                    })
+                })
+                .ok_or(io_plugin::IOPluginError::InitialisationError(
+                    "Stdin/stdout have not been piped".to_string(),
+                ))?;
+            #[allow(unused_mut)]
+            let mut handle = Self {
+                process,
+                stdio: io_plugin::Mutex::new(stdio),
+                name: "".to_string(),
+            };
+            handle.name = #name_expr;
+            Ok(handle)
+        }
+        #(#methods)*
+    });
+
     quote!(
         #generated_host
-        impl #name {
-            async fn message(&mut self, message: #message_ident) -> Result<#response_ident, Box<dyn std::error::Error>> {
-                let stdio = &self.stdio;
-                let mut stdio = stdio.lock().await;
-                io_plugin::io_write_async(std::pin::pin!(&mut stdio.stdin), message).await?;
-                Ok(
-                    io_plugin::io_read_async::<Result<_, io_plugin::IOPluginError>>(std::pin::pin!(
-                        &mut stdio.stdout
-                    ))
-                    .await??,
-                )
-            }
-            pub async fn new(mut process: io_plugin::Child) -> Result<Self, Box<dyn std::error::Error>> {
-                let stdio = process
-                    .stdin
-                    .take()
-                    .and_then(|stdin| {
-                        Some(io_plugin::ChildStdio {
-                            stdin,
-                            stdout: process.stdout.take()?,
-                        })
-                    })
-                    .ok_or(io_plugin::IOPluginError::InitialisationError(
-                        "Stdin/stdout have not been piped".to_string(),
-                    ))?;
-
-                let mut handle = Self {
-                    process,
-                    stdio: io_plugin::Mutex::new(stdio),
-                    name: "".to_string(),
-                };
-                handle.name = handle.get_name().await?;
-                Ok(handle)
-            }
-            #(#methods)*
-        }
+        #handle_impl
     )
 }
 
@@ -133,6 +168,7 @@ fn generate_method(
     response: &Variant,
     response_type: &Ident,
     params: Punctuated<FnArg, Comma>,
+    generics: &Generics,
 ) -> ImplItemFn {
     let name = format_ident!("{}", pascal_to_snake(original.ident.to_string()));
     let message_variant_name = &message.ident;
@@ -193,11 +229,41 @@ fn generate_method(
 
     let doc = get_doc(original);
 
+    let method_generics = {
+        let generics = generics.type_params();
+        let types = original
+            .fields
+            .iter()
+            .filter_map(|f| Some(f.ty.to_token_stream().to_string()))
+            .collect::<HashSet<_>>();
+        generics
+            .filter(|g| types.contains(&g.ident.to_string()))
+            .collect_vec()
+    };
+    let message_method = if {
+        let generics = generics.type_params();
+        let types = message
+            .fields
+            .iter()
+            .filter_map(|f| Some(f.ty.to_token_stream().to_string()))
+            .collect::<HashSet<_>>();
+        generics
+            .filter(|g| types.contains(&g.ident.to_string()))
+            .collect_vec()
+    }
+    .len()
+        > 0
+    {
+        format_ident!("message_generic")
+    } else {
+        format_ident!("message")
+    };
+
     parse_quote_spanned!(original.span()=>
     #[allow(unreachable_patterns)]
     #doc
-    pub async fn #name(#params) -> Result<#return_type, Box<dyn std::error::Error>> {
-        let response = self.message(#message_type::#message_variant_name/* */#message_fields).await;
+    pub async fn #name<#(#method_generics),*>(#params) -> Result<#return_type, Box<dyn std::error::Error>> {
+        let response = self.#message_method(#message_type::#message_variant_name/* */#message_fields).await;
         match response {
             Ok(#response_type::#response_variant_name/* */#response_fields) => #ok,
             Err(e) => Err(e),
@@ -215,14 +281,6 @@ fn generate_method(
 }
 
 fn generate_method_args(original: &Variant, message: &Variant) -> Punctuated<FnArg, Comma> {
-    // let self_attr = list_attr_by_id(&original.attrs, "self_behaviour");
-    // let self_behaviour = if let Some((ident, content)) = &self_attr {
-    //     let ident: Ident = parse_quote_spanned!(ident.span()=>#content);
-    //     ident.to_string()
-    // } else {
-    //     "borrow".to_string()
-    // };
-
     let mut args = izip![&original.fields, &message.fields]
         .enumerate()
         .map(|(i, (original, message))| -> FnArg {
@@ -232,26 +290,7 @@ fn generate_method_args(original: &Variant, message: &Variant) -> Punctuated<FnA
         })
         .collect::<Punctuated<_, Comma>>();
 
-    // match self_behaviour.as_str() {
-    //     "borrow" => {
-    //         let arg = parse_quote!(&self);
-    //         args.insert(0, arg);
-    //     }
-    //     "borrow_mut" => {
     let arg = parse_quote!(&mut self);
     args.insert(0, arg);
-    //     }
-    //     "none" => {}
-    //     _ => {
-    //         let mut punct = Punctuated::new();
-    //         punct.push(
-    //             parse_quote_spanned!(self_attr.unwrap().0.span()=> error: compile_error!(
-    //                 "Supported self behaviours are \"borrow_mut\", \"none\", (\"borrow\")"
-    //             )),
-    //         );
-    //         args = punct
-    //     }
-    // };
-    // args.insert(0, parse_quote!(&mut self));
     args
 }

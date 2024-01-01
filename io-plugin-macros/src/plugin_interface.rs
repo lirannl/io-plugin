@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use itertools::izip;
+use itertools::{izip, Itertools};
 use quote::format_ident;
 use syn::{
     parse_quote, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned, token::Comma, Arm,
@@ -26,12 +26,13 @@ pub fn generate_trait(
         response.variants.to_owned()
     ]
     .collect::<Vec<_>>();
+
     let methods = variants
         .iter()
-        .map(|(original, message, response)| -> TraitItemFn {
-            let name = format_ident!("{}", pascal_to_snake(original.ident.to_string()));
+        .map(|(original_v, message_v, response_v)| -> TraitItemFn {
+            let name = format_ident!("{}", pascal_to_snake(original_v.ident.to_string()));
 
-            let args = message
+            let args = message_v
                 .fields
                 .iter()
                 .enumerate()
@@ -43,7 +44,7 @@ pub fn generate_trait(
                 .collect::<Punctuated<_, Comma>>();
 
             let return_type: Type = {
-                let types = response
+                let types = response_v
                     .fields
                     .iter()
                     .map(|f| f.ty.to_owned())
@@ -53,16 +54,22 @@ pub fn generate_trait(
                 {
                     ty.to_owned()
                 } else {
-                    parse_quote_spanned!(original.span()=>(#types))
+                    parse_quote_spanned!(original_v.span()=>(#types))
                 }
             };
-            let doc = get_doc(original);
+            let doc = get_doc(original_v);
 
-            parse_quote_spanned!(original.span()=>
+            parse_quote_spanned!(original_v.span()=>
             #doc
             fn #name(&mut self, #args) -> Result<#return_type, Box<dyn std::error::Error>>;)
         })
         .collect::<Vec<_>>();
+
+    let message_generics = &message
+        .generics
+        .type_params()
+        .map(|t| t.ident.to_owned())
+        .collect_vec();
 
     let arms = variants
         .iter()
@@ -86,9 +93,9 @@ pub fn generate_trait(
                 let ty = &message.ident;
                 let v = &message_v.ident;
                 if message_idents.len() > 0 {
-                    parse_quote!(#ty::#v(#message_idents))
+                    parse_quote!(#ty::<#(#message_generics),*>::#v(#message_idents))
                 } else {
-                    parse_quote!(#ty::#v)
+                    parse_quote!(#ty::<#(#message_generics),*>::#v)
                 }
             };
             let return_expr: Expr = {
@@ -123,9 +130,14 @@ pub fn generate_trait(
     } else {
         format!("This trait defines the plugin executable's interface. To use, implement it on a struct, and call [`{name}::main_loop`] (generally in the main function)")
     };
+    let mut generics = original.generics.clone();
+    for ty in generics.type_params_mut() {
+        ty.default = None;
+    }
+
     parse_quote_spanned!(original.span()=>
     #[doc=#plugin_trait_doc]
-    #vis trait #name {
+    #vis trait #name #generics {
         #(#methods)*
         fn main_loop(mut self) -> ! where Self: Sized {
                     let mut stdin = std::io::BufReader::new(std::io::stdin());
@@ -133,7 +145,7 @@ pub fn generate_trait(
 
                     loop {
                         (|| -> Result<(), Box<dyn std::error::Error>> {
-                            let message: #message_name = io_plugin::io_read(stdin.get_mut())?;
+                            let message: #message_name <#(#message_generics),*> = io_plugin::io_read(stdin.get_mut())?;
                             let response = match message {
                                 #(#arms)*
                             };

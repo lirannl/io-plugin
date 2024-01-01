@@ -9,7 +9,7 @@ use syn::{
     Arm, Attribute, ItemEnum, ItemImpl, Meta, MetaList, MetaNameValue, Type, Variant,
 };
 
-use crate::util::get_doc;
+use crate::{util::get_doc, generics::enum_generics};
 
 type EnumVariants = Punctuated<Variant, Comma>;
 
@@ -35,8 +35,6 @@ pub fn split_enum(input: &mut ItemEnum) -> (ItemEnum, ItemEnum, ItemImpl) {
     let derives = take_attributes(&mut input.attrs, "derive")
         .into_iter()
         .find_map(attr_contents);
-
-    // let message_attributes = take_attributes(&mut input.attrs, "message_attributes");
 
     let attrs = input.attrs.iter().collect::<Punctuated<_, Semi>>();
     let (mut message_variants, mut response_variants) = (EnumVariants::new(), EnumVariants::new());
@@ -107,12 +105,15 @@ pub fn split_enum(input: &mut ItemEnum) -> (ItemEnum, ItemEnum, ItemImpl) {
         })
         .collect::<Vec<_>>();
 
+    let message_generics = enum_generics(&mut message_variants.clone().iter(), &input);
+    let response_generics = enum_generics(&mut response_variants.clone().iter(), &input);
+
     (
         parse_quote_spanned!(input.span()=>
             #[forbid(non_camel_case_types)]
             #[derive(serde::Deserialize, serde::Serialize, #derives)]
             #attrs
-            #vis enum #message_name {
+            #vis enum #message_name <#message_generics> {
                 #message_variants
             }
         ),
@@ -120,11 +121,11 @@ pub fn split_enum(input: &mut ItemEnum) -> (ItemEnum, ItemEnum, ItemImpl) {
             #[forbid(non_camel_case_types)]
             #[derive(serde::Deserialize, serde::Serialize, #derives)]
             #attrs
-            #vis enum #response_name {
+            #vis enum #response_name <#response_generics> {
                 #response_variants
             }
         ),
-        parse_quote_spanned!(input.span()=>impl #response_name {
+        parse_quote_spanned!(input.span()=>impl <#response_generics> #response_name<#response_generics> {
             #[allow(dead_code)]
             #vis fn variant_name(&self) -> &'static str {
                 match self {

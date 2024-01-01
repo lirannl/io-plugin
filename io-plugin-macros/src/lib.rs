@@ -7,6 +7,7 @@ use syn::{parse_macro_input, spanned::Spanned, ItemEnum};
 use util::GATES_PARSER;
 
 mod enums;
+mod generics;
 mod handle;
 mod plugin_interface;
 mod util;
@@ -27,16 +28,26 @@ pub fn io_plugin(attribute_data: TokenStream, input: TokenStream) -> TokenStream
         })
         .collect::<HashMap<_, _>>();
     let mut input = parse_macro_input!(input as ItemEnum);
+    if let Some(lifetime) = input.generics.lifetimes().last() {
+        return quote_spanned!(lifetime.span()=>compile_error!("lifetimes are not supported in `io_plugin`");).into();
+    }
 
     input.ident = format_ident!("{}", input.ident.to_string().trim_start_matches("_"));
 
     let (message, response, response_impl) = enums::split_enum(&mut input);
-    let host_interface = handle::generate_handle(
+
+    for ty in input.generics.type_params_mut() {
+        ty.default = None;
+    }
+
+    #[allow(unused_variables)]
+    let handle = handle::generate_handle(
         input.clone(),
         message.clone(),
         response.clone(),
         gates.clone(),
     );
+
     let plugin_interface = plugin_interface::generate_trait(
         input.clone(),
         message.clone(),
@@ -48,8 +59,8 @@ pub fn io_plugin(attribute_data: TokenStream, input: TokenStream) -> TokenStream
     #message
     #response
     #response_impl
-    #host_interface
     #plugin_interface
+    #handle
     )
     .into()
 }

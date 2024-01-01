@@ -6,7 +6,7 @@ struct Plugin {
     round: bool,
 }
 
-impl ExamplePluginTrait for Plugin {
+impl ExamplePluginTrait<f64> for Plugin {
     #[doc = r"Get the name of this plugin"]
     fn get_name(&mut self) -> Result<String, Box<dyn StdError>> {
         Ok("Division".to_string())
@@ -17,7 +17,7 @@ impl ExamplePluginTrait for Plugin {
         Ok(())
     }
 
-    fn float_op(&mut self, arg1: f64, arg2: f64) -> Result<f64, Box<dyn StdError>> {
+    fn op(&mut self, arg1: f64, arg2: f64) -> Result<f64, Box<dyn StdError>> {
         let intermediate = (arg1 as f64).div(arg2 as f64);
         if intermediate.is_nan() {
             Err(Error::MathError)?;

@@ -1,3 +1,4 @@
+#![feature(trait_alias)]
 mod protocol;
 
 pub use io_plugin_macros::*;
@@ -23,3 +24,8 @@ pub struct ChildStdio {
 
 pub type Mutex<T> = tokio::sync::Mutex<T>;
 pub type Child = tokio::process::Child;
+
+pub trait Serialise = serde::Serialize;
+pub trait Deserialise = serde::de::DeserializeOwned;
+
+pub type GenericValue = serde_cbor::Value;

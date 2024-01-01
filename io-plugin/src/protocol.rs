@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use rmp_serde::{from_slice, to_vec};
+use serde_cbor::{from_slice, to_vec, Value};
 use std::{
     error::Error,
     io::{Read, Write},
@@ -23,7 +23,7 @@ pub fn io_read<T: for<'a> Deserialize<'a>>(source: &mut dyn Read) -> Result<T, B
         }?;
         vec.extend(&buf[..size]);
     }
-    Ok(from_slice(&vec)?)
+    Ok(from_slice(vec.as_slice())?)
 }
 
 pub fn io_write<T: Serialize>(sink: &mut dyn Write, message: T) -> Result<(), Box<dyn Error>> {
@@ -47,7 +47,7 @@ pub async fn io_read_async<T: for<'a> Deserialize<'a>>(
         }?;
         vec.extend(&buf[..size]);
     }
-    Ok(from_slice(&vec)?)
+    Ok(from_slice(vec.as_slice())?)
 }
 
 pub async fn io_write_async<T: Serialize>(
@@ -59,3 +59,6 @@ pub async fn io_write_async<T: Serialize>(
     sink.flush().await?;
     Ok(())
 }
+
+#[allow(dead_code)]
+pub type Generic = Value;
