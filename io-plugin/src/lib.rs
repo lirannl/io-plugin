@@ -1,7 +1,9 @@
 #![feature(trait_alias)]
 mod protocol;
+mod tokio_exports;
 
 pub use io_plugin_macros::*;
+pub use tokio_exports::*;
 pub use protocol::{io_read, io_read_async, io_write, io_write_async};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

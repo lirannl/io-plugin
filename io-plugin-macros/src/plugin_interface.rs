@@ -61,7 +61,7 @@ pub fn generate_trait(
 
             parse_quote_spanned!(original_v.span()=>
             #doc
-            fn #name(&mut self, #args) -> Result<#return_type, Box<dyn std::error::Error>>;)
+            fn #name(&mut self, #args) -> impl std::future::Future<Output = Result<#return_type, Box<dyn std::error::Error>>>;)
         })
         .collect::<Vec<_>>();
 
@@ -110,7 +110,7 @@ pub fn generate_trait(
             let method_ident = &method.sig.ident;
             let arm = parse_quote_spanned!(original_v.span()=>
             #pat => {
-                match self.#method_ident(#message_idents) {
+                match self.#method_ident(#message_idents).await {
                     #[allow(unused_parens)]
                     Ok((#response_idents)) => Ok(#return_expr),
                     Err(err) => Err(io_plugin::IOPluginError::Other(err.to_string())),
@@ -139,30 +139,34 @@ pub fn generate_trait(
     #[doc=#plugin_trait_doc]
     #vis trait #name #generics {
         #(#methods)*
-        fn main_loop(mut self) -> ! where Self: Sized {
-                    let mut stdin = std::io::BufReader::new(std::io::stdin());
-                    let mut stdout = std::io::stdout();
+        ///Generally, you'd want to call this in the "main" func - as this starts the plugin
+        fn main_loop(mut self) -> impl std::future::Future<Output = ()> where Self: Sized { async move {
+                let mut stdin = io_plugin::stdin();
+                let mut stdout = io_plugin::stdout();
 
-                    loop {
-                        (|| -> Result<(), Box<dyn std::error::Error>> {
-                            let message: #message_name <#(#message_generics),*> = io_plugin::io_read(stdin.get_mut())?;
-                            let response = match message {
-                                #(#arms)*
-                            };
-                            io_plugin::io_write(&mut stdout, response)?;
-                            Ok(())
-                        })()
-                        .unwrap_or_else(|err| {
-                            if let Some(&io_plugin::IOPluginError::PipeClosed) =
-                                err.downcast_ref::<io_plugin::IOPluginError>()
-                            {
-                                eprintln!("Host closed");
-                                std::process::exit(0);
-                            }
-                            eprintln!("{err:#?}")
-                        });
-                    }
+                loop {
+                    self.__main_loop_iteration(&mut stdin, &mut stdout).await
+                    .unwrap_or_else(|err| {
+                        if let Some(&io_plugin::IOPluginError::PipeClosed) =
+                            err.downcast_ref::<io_plugin::IOPluginError>()
+                        {
+                            eprintln!("Host closed");
+                            std::process::exit(0);
+                        }
+                        eprintln!("{err:#?}")
+                    });
+                }
+            }}
+        ///Only used internally to iterate through recieving and then responding to messages. Call [`self::main_loop`] instead
+        fn __main_loop_iteration(&mut self, stdin: &mut io_plugin::Stdin, stdout: &mut io_plugin::Stdout) -> impl std::future::Future<Output = Result<(), Box<dyn std::error::Error>>> {
+                async { 
+                    let message: #message_name <#(#message_generics),*> = io_plugin::io_read_async(std::pin::pin!(stdin.get_mut())).await?;
+                    let response = match message {
+                        #(#arms)*
+                    };
+                    io_plugin::io_write_async(std::pin::pin!(stdout), response).await?;
+                    Ok(())
                 }
             }
-        )
+    })
 }

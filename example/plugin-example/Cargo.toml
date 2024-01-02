@@ -14,3 +14,4 @@ readme.workspace = true
 io-plugin = { path = "../../io-plugin" }
 io-plugin-example = { path = "../io-plugin-example" }
 rand = "0.8"
+tokio = { version = "1.35", features = [ "rt-multi-thread", "macros", "io-util", "sync", "process" ] }
