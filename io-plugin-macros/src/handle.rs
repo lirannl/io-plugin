@@ -242,11 +242,17 @@ fn generate_method(
     };
     let message_method = if {
         let generics = generics.type_params();
-        let types = message
+        let mut types = message
             .fields
             .iter()
             .filter_map(|f| Some(f.ty.to_token_stream().to_string()))
             .collect::<HashSet<_>>();
+        types.extend(
+            response
+                .fields
+                .iter()
+                .filter_map(|f| Some(f.ty.to_token_stream().to_string())),
+        );
         generics
             .filter(|g| types.contains(&g.ident.to_string()))
             .collect_vec()

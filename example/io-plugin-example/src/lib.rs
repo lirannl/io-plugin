@@ -9,7 +9,7 @@ pub enum ExamplePlugin<T: DeserializeOwned + Serialize> {
     ///Get the name of this plugin
     GetName(String),
     SetRounding(bool, ()),
-    Op(T, T, T),
+    Op(f64, f64, T),
     /// Get `usize` random bytes from the plugin - used to simulate large data transfer
     RandomBytes(usize, Vec<u8>),
 }

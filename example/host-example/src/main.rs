@@ -61,7 +61,7 @@ async fn react_to_line(
         return Ok(());
     };
     if let [n1, n2] = nums[..] {
-        let result = plugin.op(n1, n2).await?;
+        let result = plugin.op::<f64>(n1, n2).await?;
         println!("Result: {result}");
     } else {
     }
