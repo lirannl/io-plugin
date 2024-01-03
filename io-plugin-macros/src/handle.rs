@@ -102,24 +102,18 @@ pub fn generate_handle(
         (quote!(name), Some(quote!(name: String)))
     };
     let generics = &original.generics.params;
-    let de_generic = quote!(io_plugin::GenericValue);
     let message_generics = message
         .generics
         .type_params()
         .map(|g| g.ident.to_owned())
         .collect_vec();
-    let message_de_generics = message_generics.iter().map(|_| &de_generic).collect_vec();
     let response_generics = response
         .generics
         .type_params()
         .map(|g| g.ident.to_owned())
         .collect_vec();
-    let response_de_generics = response_generics.iter().map(|_| &de_generic).collect_vec();
     let handle_impl = quote!(impl #name {
-        async fn message(&mut self, message: #message_ident <#(#message_de_generics),*>) -> Result<#response_ident<#(#response_de_generics),*>, Box<dyn std::error::Error>> {
-            self.message_generic::<#(#message_de_generics),*>(message).await
-        }
-        async fn message_generic<#generics>(&mut self, message: #message_ident <#(#message_generics),*>) -> Result<#response_ident<#(#response_generics),*>, Box<dyn std::error::Error>> {
+        async fn message<#generics>(&mut self, message: #message_ident <#(#message_generics),*>) -> Result<#response_ident<#(#response_generics),*>, Box<dyn std::error::Error>> {
             let stdio = &self.stdio;
             let mut stdio = stdio.lock().await;
             io_plugin::io_write_async(std::pin::pin!(&mut stdio.stdin), message).await?;
@@ -240,8 +234,8 @@ fn generate_method(
             .filter(|g| types.contains(&g.ident.to_string()))
             .collect_vec()
     };
-    let message_method = if {
-        let generics = generics.type_params();
+    let de_generic = quote!(io_plugin::GenericValue);
+    let generics = {
         let mut types = message
             .fields
             .iter()
@@ -253,23 +247,20 @@ fn generate_method(
                 .iter()
                 .filter_map(|f| Some(f.ty.to_token_stream().to_string())),
         );
-        generics
-            .filter(|g| types.contains(&g.ident.to_string()))
+        generics.type_params()
+            .map(|tp| if types.contains(&tp.ident.to_string()) {
+                tp.ident.to_token_stream()
+            } else {
+                de_generic.clone()
+            })
             .collect_vec()
-    }
-    .len()
-        > 0
-    {
-        format_ident!("message_generic")
-    } else {
-        format_ident!("message")
     };
 
     parse_quote_spanned!(original.span()=>
     #[allow(unreachable_patterns)]
     #doc
     pub async fn #name<#(#method_generics),*>(#params) -> Result<#return_type, Box<dyn std::error::Error>> {
-        let response = self.#message_method(#message_type::#message_variant_name/* */#message_fields).await;
+        let response = self.message::<#(#generics),*>(#message_type::#message_variant_name/* */#message_fields).await;
         match response {
             Ok(#response_type::#response_variant_name/* */#response_fields) => #ok,
             Err(e) => Err(e),

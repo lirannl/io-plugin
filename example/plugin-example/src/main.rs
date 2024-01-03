@@ -7,7 +7,7 @@ struct Plugin {
     round: bool,
 }
 
-impl ExamplePluginTrait<f64> for Plugin {
+impl ExamplePluginTrait<f64, String> for Plugin {
     #[doc = r"Get the name of this plugin"]
     async fn get_name(&mut self) -> Result<String, Box<dyn StdError>> {
         Ok("Division".to_string())
