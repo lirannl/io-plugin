@@ -256,7 +256,7 @@ fn generate_method(
             .collect_vec()
     };
 
-    parse_quote_spanned!(original.span()=>
+    parse_quote_spanned!(original.ident.span()=>
     #[allow(unreachable_patterns)]
     #doc
     pub async fn #name<#(#method_generics),*>(#params) -> Result<#return_type, Box<dyn std::error::Error>> {

@@ -2,7 +2,9 @@
 use io_plugin_example::{Error, ExamplePluginHandle};
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::{error::Error as StdError, process::Stdio as StdioBehaviour, path::PathBuf, str::FromStr};
+use std::{
+    error::Error as StdError, path::PathBuf, process::Stdio as StdioBehaviour, str::FromStr,
+};
 use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
     main,
@@ -46,7 +48,10 @@ async fn react_to_line(
         .into_iter()
         .filter_map(|c| Some(c.as_str().parse::<f64>().ok()?))
         .collect::<Vec<_>>();
-    if line.starts_with("request_bytes ") {
+    if line == "get" {
+        println!("State is: {}", plugin.get_state().await?);
+        return Ok(());
+    } else if line.starts_with("request_bytes ") {
         let bytes = plugin
             .random_bytes(
                 nums.get(0)
@@ -58,6 +63,16 @@ async fn react_to_line(
             )
             .await?;
         println!("Got {} bytes!", bytes.len());
+        return Ok(());
+    } else if line.starts_with("set ") {
+        plugin
+            .set_state(
+                nums.get(0)
+                    .ok_or(Error::Generic("No new state provided.".to_string()))?
+                    .to_string()
+                    .parse()?,
+            )
+            .await?;
         return Ok(());
     };
     if let [n1, n2] = nums[..] {

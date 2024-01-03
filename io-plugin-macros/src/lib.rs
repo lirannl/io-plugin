@@ -13,9 +13,14 @@ mod plugin_interface;
 mod util;
 
 /// Generate a plugin-interface, based on an enum definition for its' operations
+/// From the plugin's perspective - input types are all fields except the last one, and the output type is the last one 
+/// (of course - you can use tuples to output multiple values).
 ///
 /// The provided enum's variant must contain only owned data (no &'a) - otherwise, deserialiastaion will cause a compile-time error.
 /// The variants must be [`serde::Serialize`] + [`serde::Deserialize`].
+/// 
+/// Note that the enum this attribute applies to won't exist.  
+/// Instead, there will be a `message` enum, `response` enum, plugin `trait`, plugin `handle` (a struct) - postfixed with the highlighted words.
 #[proc_macro_attribute]
 pub fn io_plugin(attribute_data: TokenStream, input: TokenStream) -> TokenStream {
     let gates = GATES_PARSER
@@ -48,7 +53,7 @@ pub fn io_plugin(attribute_data: TokenStream, input: TokenStream) -> TokenStream
         gates.clone(),
     );
 
-    let plugin_interface = plugin_interface::generate_trait(
+    let (plugin_interface, main_loop_iteration) = plugin_interface::generate_trait(
         input.clone(),
         message.clone(),
         response.clone(),
@@ -57,9 +62,13 @@ pub fn io_plugin(attribute_data: TokenStream, input: TokenStream) -> TokenStream
 
     quote_spanned!(message.span()=>
     #message
+
     #response
     #response_impl
+
     #plugin_interface
+    #main_loop_iteration
+
     #handle
     )
     .into()

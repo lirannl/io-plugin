@@ -9,16 +9,16 @@ members = [
 ]
 default-members = ["io-plugin"]
 
-package.version = "0.5.1"
+package.version = "0.5.2"
 
 package.authors = ["Liran Piade"]
 
-package.repository = "https://github.com/lirannl/plugins-io-rs"
+package.repository = "https://github.com/lirannl/io-plugin"
 
 package.edition = "2021"
 
 package.license = "GPL-3.0-only"
 
-package.homepage = "https://github.com/lirannl/plugins-io-rs"
+package.homepage = "https://github.com/lirannl/io-plugin"
 
 package.readme = "readme.md"

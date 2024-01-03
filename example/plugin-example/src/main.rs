@@ -1,21 +1,15 @@
 use io_plugin_example::{Error, ExamplePluginTrait};
-use rand::{thread_rng, Rng};
-use tokio::main;
 use std::{error::Error as StdError, ops::Div};
+use tokio::main;
 
 struct Plugin {
-    round: bool,
+    state: i32,
 }
 
-impl ExamplePluginTrait<f64, String> for Plugin {
+impl ExamplePluginTrait<f64> for Plugin {
     #[doc = r"Get the name of this plugin"]
     async fn get_name(&mut self) -> Result<String, Box<dyn StdError>> {
         Ok("Division".to_string())
-    }
-
-    async fn set_rounding(&mut self, new_rounding_value: bool) -> Result<(), Box<dyn StdError>> {
-        self.round = new_rounding_value;
-        Ok(())
     }
 
     async fn op(&mut self, arg1: f64, arg2: f64) -> Result<f64, Box<dyn StdError>> {
@@ -23,23 +17,31 @@ impl ExamplePluginTrait<f64, String> for Plugin {
         if intermediate.is_nan() {
             Err(Error::MathError)?;
         }
-        if self.round {
-            Ok(intermediate.round())
-        } else {
-            Ok(intermediate)
-        }
+        Ok(intermediate)
     }
 
-    async fn random_bytes(&mut self, amount: usize) -> Result<Vec<u8>, Box<dyn StdError>> {
-        let mut vec = Vec::with_capacity(amount);
-        for _ in 0..amount {
-            vec.push(thread_rng().gen())
-        }
-        Ok(vec)
+    async fn set_state(
+        &mut self,
+        new_state: i32,
+    ) -> Result<(), Box<dyn StdError>>
+    where
+        Self: Sized,
+    {
+        self.state = new_state;
+        Ok(())
+    }
+
+    async fn get_state(
+        &mut self,
+    ) ->Result<i32, Box<dyn StdError>>
+    where
+        Self: Sized,
+    {
+        Ok(self.state)
     }
 }
 
 #[main]
 async fn main() {
-    ExamplePluginTrait::main_loop(Plugin { round: true }).await
+    Plugin { state: 0 }.main_loop().await
 }
