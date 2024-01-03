@@ -3,16 +3,13 @@ use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use regex::Regex;
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
-};
+use std::{collections::HashSet, fmt::Display};
 use syn::{
     parse_quote, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned, token::Comma,
-    FnArg, Generics, Ident, ImplItemFn, ItemEnum, ItemStruct, Type, Variant,
+    FnArg, Generics, Ident, ImplItemFn, ItemEnum, ItemStruct, Type, Variant, Attribute,
 };
 
-use crate::util::{generate_gate, get_doc, list_attr_by_id};
+use crate::util::{get_doc, list_attr_by_id};
 
 lazy_static! {
     pub static ref PASCAL_PARTS: Regex = Regex::new("[A-Z0-9_][a-z0-9_]+").unwrap();
@@ -37,9 +34,9 @@ pub fn generate_handle(
     original: ItemEnum,
     message: ItemEnum,
     response: ItemEnum,
-    gates: HashMap<String, String>,
+    gate: Option<Attribute>,
 ) -> TokenStream {
-    let host_gate = generate_gate(gates.get("host"));
+    // let host_gate = generate_gate(gates.get("host"));
     let vis = &message.vis;
     let plugin_name = &original.ident;
     let name = format_ident!("{}Handle", plugin_name);
@@ -79,7 +76,7 @@ pub fn generate_handle(
         format!("{article} `{plugin_name}` handle on the host")
     };
 
-    let mut generated_host: ItemStruct = parse_quote_spanned!(message.span()=>
+    let generated_host: ItemStruct = parse_quote_spanned!(message.span()=>
     #[doc = #handle_doc]
     #vis struct #name {
             pub stdio: io_plugin::Mutex<io_plugin::ChildStdio>,
@@ -87,9 +84,6 @@ pub fn generate_handle(
             pub process: io_plugin::Child,
         }
     );
-    if let Some(host_gate) = host_gate {
-        generated_host.attrs.extend_one(host_gate);
-    }
 
     let (name_expr, name_param) = if let Some(get_name) = methods
         .iter()
@@ -150,7 +144,10 @@ pub fn generate_handle(
     });
 
     quote!(
+        #gate
         #generated_host
+        
+        #gate
         #handle_impl
     )
 }
@@ -247,11 +244,14 @@ fn generate_method(
                 .iter()
                 .filter_map(|f| Some(f.ty.to_token_stream().to_string())),
         );
-        generics.type_params()
-            .map(|tp| if types.contains(&tp.ident.to_string()) {
-                tp.ident.to_token_stream()
-            } else {
-                de_generic.clone()
+        generics
+            .type_params()
+            .map(|tp| {
+                if types.contains(&tp.ident.to_string()) {
+                    tp.ident.to_token_stream()
+                } else {
+                    de_generic.clone()
+                }
             })
             .collect_vec()
     };

@@ -9,7 +9,7 @@ members = [
 ]
 default-members = ["io-plugin"]
 
-package.version = "0.5.2"
+package.version = "0.5.3"
 
 package.authors = ["Liran Piade"]
 

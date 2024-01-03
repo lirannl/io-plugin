@@ -1,10 +1,12 @@
 use io_plugin::{handle_doc, io_plugin};
-use rand::{thread_rng, Rng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+#[cfg(feature="plugin")]
+use rand::{thread_rng, Rng};
+#[cfg(feature="plugin")]
 use std::error::Error as StdError;
 use thiserror::Error;
 
-#[io_plugin]
+#[io_plugin(plugin_trait = "plugin", handle = "host")]
 #[derive(Clone)]
 #[handle_doc("async `ExamplePlugin` handle")]
 pub enum ExamplePlugin<T: DeserializeOwned + Serialize> {
@@ -26,6 +28,7 @@ pub enum Error {
     Generic(String),
 }
 
+#[cfg(feature="plugin")]
 async fn gen_bytes<T: DeserializeOwned + Serialize>(
     _plugin: &mut dyn ExamplePluginTrait<T>,
     amount: usize,

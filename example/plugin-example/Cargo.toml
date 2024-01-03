@@ -12,5 +12,11 @@ readme.workspace = true
 
 [dependencies]
 io-plugin = { path = "../../io-plugin" }
-io-plugin-example = { path = "../io-plugin-example" }
-tokio = { version = "1.35", features = [ "rt-multi-thread", "macros", "io-util", "sync", "process" ] }
+io-plugin-example = { path = "../io-plugin-example", features = ["plugin"] }
+tokio = { version = "1.35", features = [
+    "rt-multi-thread",
+    "macros",
+    "io-util",
+    "sync",
+    "process",
+] }

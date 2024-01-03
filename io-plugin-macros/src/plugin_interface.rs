@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use itertools::{izip, Itertools};
 use quote::{format_ident, quote, quote_spanned, ToTokens};
 use syn::{
@@ -16,7 +14,7 @@ pub fn generate_trait(
     original: ItemEnum,
     message: ItemEnum,
     response: ItemEnum,
-    _gates: HashMap<String, String>,
+    // _gates: HashMap<String, String>,
 ) -> (ItemTrait, ItemFn) {
     let name = format_ident!("{}Trait", original.ident);
     let vis = &original.vis;
