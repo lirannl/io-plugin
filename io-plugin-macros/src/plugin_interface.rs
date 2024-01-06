@@ -1,8 +1,8 @@
 use itertools::{izip, Itertools};
-use quote::{format_ident, quote, quote_spanned, ToTokens};
+use quote::{format_ident, quote};
 use syn::{
     parse_quote, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned, token::Comma, Arm,
-    Expr, ItemEnum, ItemFn, ItemTrait, Pat, TraitItemFn, Type, Path, Ident,
+    Expr, Ident, ItemEnum, ItemFn, ItemTrait, Pat, TraitItemFn, Type,
 };
 
 use crate::{
@@ -14,7 +14,7 @@ pub fn generate_trait(
     original: ItemEnum,
     message: ItemEnum,
     response: ItemEnum,
-    // _gates: HashMap<String, String>,
+    gate: Option<&String>,
 ) -> (ItemTrait, ItemFn) {
     let name = format_ident!("{}Trait", original.ident);
     let vis = &original.vis;
@@ -27,7 +27,7 @@ pub fn generate_trait(
 
     let methods = variants
         .iter()
-        .map(|(original_v, message_v, response_v)| -> TraitItemFn {
+        .map(|(original_v, message_v, response_v)| {
             let name = format_ident!("{}", pascal_to_snake(original_v.ident.to_string()));
 
             let args = message_v
@@ -40,7 +40,7 @@ pub fn generate_trait(
                     (parse_quote_spanned! {f.span()=>#name}, ty.to_owned())
                 })
                 .collect_vec();
-            let arg_idents = args.iter().map(|(id, _)| id).collect_vec();
+            // let arg_idents = args.iter().map(|(id, _)| id).collect_vec();
             let fn_args = args.iter().map(|(id, ty)| quote!(#id: #ty));
 
             let return_type: Type = {
@@ -58,28 +58,21 @@ pub fn generate_trait(
                 }
             };
             let doc = get_doc(original_v);
-            let implementation = 
-            if let Some((_, content)) = list_attr_by_id(original_v.attrs.as_slice(), "implementation") {
-                let implementation: Path = parse_quote!(#content);
 
-                if {
-                    let types = args.iter().map(|t| t.1.to_token_stream().to_string()).collect_vec();
-                    original.generics.type_params().any(|g| types.contains(&g.ident.to_string()))
-                }
-                {quote_spanned!(original_v.fields.span()=>{compile_error!("generics are not supported in plugin methods with default implementations")})}
-                else 
-{
-                quote_spanned!(implementation.span()=>{ async move {
-                    #implementation(self, #(#arg_idents),*).await
-                }})
-            }
-            } else {
-                quote!(;)
-            }
-            ;
-            parse_quote_spanned!(original_v.span()=>
+            let mut method: TraitItemFn = parse_quote_spanned!(original_v.span()=>
             #doc
-            fn #name(&mut self, #(#fn_args),*) -> impl std::future::Future<Output = Result<#return_type, Box<dyn std::error::Error>>> where Self: Sized #implementation)
+            fn #name(&mut self, #(#fn_args),*) -> impl std::future::Future<Output = Result<#return_type, Box<dyn std::error::Error>>> where Self: Sized;);
+            if let Some((_, content)) = list_attr_by_id(original_v.attrs.as_slice(), "implementation") 
+            {
+                method.attrs.extend_one(
+                    if let Some(gate) = gate {
+                        let gate = gate.trim_matches('"');
+                        parse_quote!(#[cfg_attr(feature = #gate, io_plugin::trait_method_default(#content))])
+                    } else {
+                        parse_quote!(#[io_plugin::trait_method_default(#content)])
+                    });
+            }
+            method
         })
         .collect::<Vec<_>>();
 

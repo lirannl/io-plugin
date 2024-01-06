@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use proc_macro::TokenStream;
-use quote::{format_ident, quote_spanned};
-use syn::{parse_macro_input, spanned::Spanned, ItemEnum};
+use quote::{format_ident, quote, quote_spanned, ToTokens};
+use syn::{spanned::Spanned, ItemEnum, Path, TraitItemFn, parse_macro_input};
 
 use crate::{feature_gates::FeatureGates, util::generate_gate};
 
@@ -50,10 +50,10 @@ pub fn io_plugin(attribute_data: TokenStream, input: TokenStream) -> TokenStream
         generate_gate(gates.get("handle")),
     );
 
+    let gate = gates.get("plugin_trait");
     let (plugin_trait, main_loop_iteration) =
-        plugin_interface::generate_trait(input.clone(), message.clone(), response.clone());
-
-    let plugin_trait_gate = generate_gate(gates.get("plugin_trait"));
+        plugin_interface::generate_trait(input.clone(), message.clone(), response.clone(), gate);
+    let plugin_trait_gate = generate_gate(gate);
 
     quote_spanned!(message.span()=>
     #message
@@ -94,4 +94,26 @@ pub fn message_attributes(_attr: TokenStream, item: TokenStream) -> TokenStream 
 #[proc_macro_attribute]
 pub fn response_attributes(_attr: TokenStream, item: TokenStream) -> TokenStream {
     item
+}
+
+/// Provide a default implementation for a plugin method
+#[proc_macro_attribute]
+pub fn trait_method_default(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut method = parse_macro_input!(item as TraitItemFn);
+    let signature = &method.sig;
+    let args = signature.inputs.iter().filter_map(|arg| {
+        if let syn::FnArg::Typed(arg) = arg {
+            Some(arg.pat.to_token_stream())
+        } else {
+            None
+        }
+    });
+    let implementation = parse_macro_input!(attr as Path);
+    method.semi_token = None;
+    quote!(#signature {
+        async move {
+            #implementation(self, #(#args),*).await
+        }
+    })
+    .into()
 }

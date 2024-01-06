@@ -9,7 +9,7 @@ homepage.workspace = true
 readme.workspace = true
 
 [dependencies]
-io-plugin-example = { path = "../io-plugin-example", features = ["host"] }
+io-plugin-example = { path = "../io-plugin-example", default_features = false, features = ["host"] }
 tokio = { version = "1.35", features = [
     "rt-multi-thread",
     "macros",

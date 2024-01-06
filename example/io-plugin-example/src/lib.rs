@@ -1,8 +1,8 @@
 use io_plugin::{handle_doc, io_plugin};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-#[cfg(feature="plugin")]
+#[cfg(feature = "plugin")]
 use rand::{thread_rng, Rng};
-#[cfg(feature="plugin")]
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+#[cfg(feature = "plugin")]
 use std::error::Error as StdError;
 use thiserror::Error;
 
@@ -28,8 +28,8 @@ pub enum Error {
     Generic(String),
 }
 
-#[cfg(feature="plugin")]
-async fn gen_bytes<T: DeserializeOwned + Serialize>(
+#[cfg(feature = "plugin")]
+pub async fn gen_bytes<T: DeserializeOwned + Serialize>(
     _plugin: &mut dyn ExamplePluginTrait<T>,
     amount: usize,
 ) -> Result<Vec<u8>, Box<dyn StdError>> {

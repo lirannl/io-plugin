@@ -20,10 +20,7 @@ impl ExamplePluginTrait<f64> for Plugin {
         Ok(intermediate)
     }
 
-    async fn set_state(
-        &mut self,
-        new_state: i32,
-    ) -> Result<(), Box<dyn StdError>>
+    async fn set_state(&mut self, new_state: i32) -> Result<(), Box<dyn StdError>>
     where
         Self: Sized,
     {
@@ -31,9 +28,7 @@ impl ExamplePluginTrait<f64> for Plugin {
         Ok(())
     }
 
-    async fn get_state(
-        &mut self,
-    ) ->Result<i32, Box<dyn StdError>>
+    async fn get_state(&mut self) -> Result<i32, Box<dyn StdError>>
     where
         Self: Sized,
     {
@@ -43,5 +38,6 @@ impl ExamplePluginTrait<f64> for Plugin {
 
 #[main]
 async fn main() {
+    // let bytes = io_plugin_example::gen_bytes(10).await;
     Plugin { state: 0 }.main_loop().await
 }
