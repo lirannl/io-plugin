@@ -2,24 +2,17 @@
 use io_plugin_example::{Error, ExamplePluginHandle};
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::{
-    error::Error as StdError, path::PathBuf, process::Stdio as StdioBehaviour, str::FromStr,
-};
+use std::{error::Error as StdError, path::PathBuf, str::FromStr};
 use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
     main,
-    process::Command,
 };
 
 #[main]
 async fn main() {
     let mut plugin = (async || -> Result<_, Box<dyn StdError>> {
         let path = PathBuf::from_str("target/debug/plugin-example")?;
-        let process = Command::new(path)
-            .stdin(StdioBehaviour::piped())
-            .stdout(StdioBehaviour::piped())
-            .spawn()?;
-        Ok(ExamplePluginHandle::new(process).await?)
+        Ok(ExamplePluginHandle::new(path).await?)
     })()
     .await
     .unwrap();
@@ -82,5 +75,3 @@ async fn react_to_line(
     }
     Ok(())
 }
-
-

@@ -82,6 +82,7 @@ pub fn generate_handle(
             pub stdio: io_plugin::Mutex<io_plugin::ChildStdio>,
             pub name: std::string::String,
             pub process: io_plugin::Child,
+            pub path: std::path::PathBuf,
         }
     );
 
@@ -118,7 +119,8 @@ pub fn generate_handle(
                 .await??,
             )
         }
-        pub async fn new(mut process: io_plugin::Child, #name_param) -> Result<Self, Box<dyn std::error::Error>> {
+        pub async fn new(path: std::path::PathBuf, #name_param) -> Result<Self, Box<dyn std::error::Error>> {
+            let mut process = io_plugin::spawn_process(&path)?;
             let stdio = process
                 .stdin
                 .take()
@@ -136,6 +138,7 @@ pub fn generate_handle(
                 process,
                 stdio: io_plugin::Mutex::new(stdio),
                 name: "".to_string(),
+                path
             };
             handle.name = #name_expr;
             Ok(handle)
